@@ -6,11 +6,6 @@ HTML_DESTINATION_DIR=$(PACKAGE_DATA_DIR)/www
 
 VERSION=$(shell git describe)
 
-#for the testing purpose
-#requires the vms created and ready
-VM_NAME_AMD64=test-amd64
-SNAPSHOT_NAME=booted_ip_sshkey
-
 #the default target build all debian packages 
 all : build_all_packages
 
@@ -37,17 +32,16 @@ build_i386_linux_pkg : copy_www_files build_i386_linux_binary
 	fakeroot dpkg --build $@/$(PACKAGE_NAME) $(PACKAGE_NAME)_$(VERSION)_i386.deb
 
 build_amd64_linux_pkg : copy_www_files build_amd64_linux_binary
+	echo $@
 	mkdir -p $@
 	mkdir -p $@/$(PACKAGE_NAME)/opt/$(PACKAGE_NAME)/bin
 	cp -r $(PACKAGE_NAME) $@/
-	source ../env/bin/activate
-	pip install -r requirements.txt 
 	python3 ./createcontrolfile.py -a amd64 -t control.tmpl -d $@/$(PACKAGE_NAME)/DEBIAN/control
 	cp build_amd64_linux_binary/lan-monitor-server $@/$(PACKAGE_NAME)/opt/$(PACKAGE_NAME)/bin/
 	
 	#build the $@ with version $(VERSION)
 	fakeroot dpkg --build $@/$(PACKAGE_NAME) $(PACKAGE_NAME)_$(VERSION)_amd64.deb
-	source deactivate
+	deactivate
 
 build_armhf_linux_pkg : copy_www_files build_armhf_linux_binary
 	mkdir -p $@
@@ -76,30 +70,12 @@ build_amd64_linux_binary :
 	cd ../lan-monitor-server; \
 	GOOS=linux GOARCH=amd64 go build -ldflags="-X main.version=$(VERSION)"
 	mv ../lan-monitor-server/lan-monitor-server $@/
-	source deactivate
 
 build_armhf_linux_binary : 
 	mkdir -p $@; 
 	cd ../lan-monitor-server; \
 	GOOS=linux GOARCH=arm go build -ldflags="-X main.version=$(VERSION)"
 	mv ../lan-monitor-server/lan-monitor-server $@/
-
-test_amd64_vbox : build_amd64_linux_pkg
-	#VBoxManage showvminfo $(VM_NAME_AMD64) | grep -c "running (since" && VBoxManage controlvm $(VM_NAME_AMD64) poweroff; \
-
-	#give the vm mangager some time
-	sleep 1
-
-	#restore the old snapshot
-	VBoxManage snapshot $(VM_NAME_AMD64) restore $(SNAPSHOT_NAME)
-
-	#power on the vm
-	VBoxManage startvm $(VM_NAME_AMD64)
-
-	scp $(PACKAGE_NAME)_$(VERSION)_amd64.deb root@192.168.0.175:~/
-	ssh root@192.168.0.175 apt-get install nmap -y
-	ssh root@192.168.0.175 dpkg -i $(PACKAGE_NAME)_$(VERSION)_amd64.deb
-	ssh root@192.168.0.175 systemctl status lan-monitor-server
 
 #cleanup
 clean : clean_binary_builds clean_package_builds clean_packages clean_package_files
