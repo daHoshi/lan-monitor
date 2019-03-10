@@ -6,8 +6,8 @@ HTML_DESTINATION_DIR=$(PACKAGE_DATA_DIR)/www
 
 VERSION=$(shell git describe)
 
-#the default target build all debian packages 
-all : build_all_packages
+#the default target build all debian packages
+all : build_all_packages build_all_stand_alones
 
 compose_pkg_files : copy_www_files 
 
@@ -15,12 +15,38 @@ compose_pkg_files : copy_www_files
 copy_www_files : 
 	mkdir -p ./$(HTML_DESTINATION_DIR)
 	cp ../www/index.html ./$(HTML_DESTINATION_DIR)/
-	cp -r ../www/css ./$(HTML_DESTINATION_DIR)/
 	cp -r ../www/img ./$(HTML_DESTINATION_DIR)/
 	cp -r ../www/js ./$(HTML_DESTINATION_DIR)/
+	cp -r ../www/lib ./$(HTML_DESTINATION_DIR)/
+
+
+build_all_stand_alones : lan-monitor_i386_linux_std_alone lan-monitor_amd64_linux_std_alone lan-monitor_armhf_linux_std_alone
 
 build_all_packages : build_i386_linux_pkg build_amd64_linux_pkg build_armhf_linux_pkg
 
+#build stand alones (executable and webdir)
+lan-monitor_i386_linux_std_alone : copy_www_files build_i386_linux_binary 
+	mkdir -p $@/www
+	mkdir -p $@/bin
+	cp build_i386_linux_binary/* $@/bin/
+	cp -r $(HTML_DESTINATION_DIR)/* $@/www/
+	tar -czvf $@.tar.gz  $@
+
+lan-monitor_amd64_linux_std_alone : copy_www_files build_amd64_linux_binary
+	mkdir -p $@/www
+	mkdir -p $@/bin
+	cp build_amd64_linux_binary/* $@/bin/
+	cp -r $(HTML_DESTINATION_DIR)/* $@/www/
+	tar -czvf $@.tar.gz  $@
+
+lan-monitor_armhf_linux_std_alone : copy_www_files build_armhf_linux_binary
+	mkdir -p $@/www
+	mkdir -p $@/bin
+	cp build_armhf_linux_binary/* $@/bin/
+	cp -r $(HTML_DESTINATION_DIR)/* $@/www/
+	tar -czvf $@.tar.gz  $@
+
+#build the debian packages
 build_i386_linux_pkg : copy_www_files build_i386_linux_binary
 	mkdir -p $@
 	mkdir -p $@/$(PACKAGE_NAME)/opt/$(PACKAGE_NAME)/bin
@@ -36,7 +62,8 @@ build_amd64_linux_pkg : copy_www_files build_amd64_linux_binary
 	mkdir -p $@
 	mkdir -p $@/$(PACKAGE_NAME)/opt/$(PACKAGE_NAME)/bin
 	cp -r $(PACKAGE_NAME) $@/
-	python3 ./createcontrolfile.py -a amd64 -t control.tmpl -d $@/$(PACKAGE_NAME)/DEBIAN/control
+
+	./createcontrolfile.py -a amd64 -t control.tmpl -d $@/$(PACKAGE_NAME)/DEBIAN/control
 	cp build_amd64_linux_binary/lan-monitor-server $@/$(PACKAGE_NAME)/opt/$(PACKAGE_NAME)/bin/
 	
 	#build the $@ with version $(VERSION)
@@ -64,9 +91,6 @@ build_i386_linux_binary :
 
 build_amd64_linux_binary : 
 	mkdir -p $@; 
-	source ../env/bin/activate
-	pip install -r requirements.txt 
-	VERSION=$(python3 ./createcontrolfile.py -v)
 	cd ../lan-monitor-server; \
 	GOOS=linux GOARCH=amd64 go build -ldflags="-X main.version=$(VERSION)"
 	mv ../lan-monitor-server/lan-monitor-server $@/
@@ -77,8 +101,33 @@ build_armhf_linux_binary :
 	GOOS=linux GOARCH=arm go build -ldflags="-X main.version=$(VERSION)"
 	mv ../lan-monitor-server/lan-monitor-server $@/
 
+test_amd64_vbox : build_amd64_linux_pkg
+	#VBoxManage showvminfo $(VM_NAME_AMD64) | grep -c "running (since" && VBoxManage controlvm $(VM_NAME_AMD64) poweroff; \
+
+	#give the vm mangager some time
+	sleep 1
+
+	#restore the old snapshot
+	VBoxManage snapshot $(VM_NAME_AMD64) restore $(SNAPSHOT_NAME)
+
+	#power on the vm
+	VBoxManage startvm $(VM_NAME_AMD64)
+	
+	#give some more time
+	sleep 2
+
+	scp $(PACKAGE_NAME)_$(VERSION)_amd64.deb root@192.168.0.175:~/
+	ssh root@192.168.0.175 apt install nmap -y
+	ssh root@192.168.0.175 dpkg -i $(PACKAGE_NAME)_$(VERSION)_amd64.deb
+	ssh root@192.168.0.175 systemctl status lan-monitor-server
+
 #cleanup
-clean : clean_binary_builds clean_package_builds clean_packages clean_package_files
+clean : clean_binary_builds clean_package_builds clean_packages clean_package_files clean_stand_alone_builds clean_tarballs
+
+clean_stand_alone_builds :
+	rm -rf lan-monitor_i386_linux_std_alone
+	rm -rf lan-monitor_amd64_linux_std_alone
+	rm -rf lan-monitor_armhf_linux_std_alone
 
 clean_binary_builds : 
 	rm -rf build_armhf_linux_binary
@@ -95,3 +144,6 @@ clean_package_files :
 
 clean_packages : 
 	rm -rf *.deb
+
+clean_tarballs :
+	rm -rf *.tar.gz
