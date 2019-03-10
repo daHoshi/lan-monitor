@@ -140,9 +140,8 @@ func main() {
 	//defaults
 	var config Config
 	defaultConfigFileLocation := "/etc/lan-monitor.conf"
-	config.HTTPPort = 8080
-	config.NMAPRange = "192.168.1.1/24"
-	config.NMAPPorts = "22,80"
+	config.HTTPPort = 8030
+	config.NMAPRange = "192.168.1.2/24"
 	config.ScanInterval = 120 //seconds
 
 	displayVersion := flag.Bool("version", false, "Prints the version number")
@@ -154,6 +153,8 @@ func main() {
 
 	//read the configfile
 	config = ReadConfig(*configFileLocation)
+
+	config.NMAPPorts = "22,80"
 
 	//if no range is defined in the config file
 	if config.NMAPRange == "" {
