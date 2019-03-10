@@ -20,7 +20,7 @@ function initModal() {
     span.onclick = function () {
         cleanModal();
         modal.style.display = "none";
-    }
+    };
 }
 
 function start() {
@@ -164,7 +164,7 @@ function scan(xml) {
         var hostElement = xmlDoc.getElementsByTagName("host")[i];
         var ip = hostElement.getElementsByTagName("address")[0].getAttribute("addr");
         var hostNameElement = hostElement.getElementsByTagName("hostnames")[0].getElementsByTagName("hostname")[0];
-        let hostname = " "
+        let hostname = " ";
 
         if (hostNameElement) {
             hostName = Hostname_Element.getAttribute("name");
