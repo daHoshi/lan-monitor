@@ -51,7 +51,7 @@ build_i386_linux_pkg : copy_www_files build_i386_linux_binary
 	mkdir -p $@
 	mkdir -p $@/$(PACKAGE_NAME)/opt/$(PACKAGE_NAME)/bin
 	cp -r $(PACKAGE_NAME) $@/
-	./createcontrolfile.py -a i386 -t control.tmpl -d $@/$(PACKAGE_NAME)/DEBIAN/control
+	python3 createcontrolfile.py -a i386 -t control.tmpl -d $@/$(PACKAGE_NAME)/DEBIAN/control
 	cp build_i386_linux_binary/lan-monitor-server $@/$(PACKAGE_NAME)/opt/$(PACKAGE_NAME)/bin/
 	
 	#build the $@ with version $(VERSION)
@@ -63,12 +63,11 @@ build_amd64_linux_pkg : copy_www_files build_amd64_linux_binary
 	mkdir -p $@/$(PACKAGE_NAME)/opt/$(PACKAGE_NAME)/bin
 	cp -r $(PACKAGE_NAME) $@/
 
-	./createcontrolfile.py -a amd64 -t control.tmpl -d $@/$(PACKAGE_NAME)/DEBIAN/control
+	python3 createcontrolfile.py -a amd64 -t control.tmpl -d $@/$(PACKAGE_NAME)/DEBIAN/control
 	cp build_amd64_linux_binary/lan-monitor-server $@/$(PACKAGE_NAME)/opt/$(PACKAGE_NAME)/bin/
 	
 	#build the $@ with version $(VERSION)
 	fakeroot dpkg --build $@/$(PACKAGE_NAME) $(PACKAGE_NAME)_$(VERSION)_amd64.deb
-	deactivate
 
 build_armhf_linux_pkg : copy_www_files build_armhf_linux_binary
 	mkdir -p $@
