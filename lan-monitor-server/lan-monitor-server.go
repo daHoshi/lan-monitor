@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
+	"path"
 	"strconv"
 	"sync"
 	"time"
@@ -38,10 +38,10 @@ type msg struct {
 
 //Config data struct to read the config file
 type Config struct {
-	NMAPRange    string
-	NMAPPorts    string //comma separated
-	HTTPPort     int
-	ScanInterval int //seconds
+	NMAPRange    string `json:"nmap_range,omitempty"`
+	NMAPPorts    string `json:"nmap_ports,omitempty"` //comma separated
+	HTTPPort     int    `json:"http_port,omitempty"`
+	ScanInterval int    `json:"scan_interval,omitempty"` //seconds
 }
 
 func echo(conn *websocket.Conn) {
@@ -113,7 +113,10 @@ func callNMAP(conf Config) {
 		}
 		log.Println("Writing to websockets")
 		for c := range cons {
-			c.WriteMessage(1, nmapJSON.Bytes())
+			err := c.WriteMessage(1, nmapJSON.Bytes())
+			if err != nil {
+				fmt.Printf("failed to write message! Cause: %v", err)
+			}
 		}
 		<-time.After(time.Duration(conf.ScanInterval) * time.Second)
 	}
@@ -148,38 +151,30 @@ func main() {
 	//3rd if none of the above is applied the program reverts to the hardcoded defaults
 
 	//defaults
-	var config Config
-<<<<<<< HEAD
 	defaultConfigFileLocation := "/etc/lan-monitor.conf"
-	config.HTTPPort = 8030
-	config.NMAPRange = "192.168.1.2/24"
-=======
-	defaultConfigFileLocation := "/etc/lan-monitor.json"
-	config.HTTPPort = 8080
-	config.NMAPRange = "192.168.0.1/24"
-	config.NMAPPorts = "22,80"
->>>>>>> upstream/master
-	config.ScanInterval = 120 //seconds
+	var defaultHTTPPort = 8030
+	var defaultNMAPRange = "192.168.0.2/24"
+	var defaultNMAPPorts = "22,80"
+	var defaultScanInterval = 120 //seconds
 
 	displayVersion := flag.Bool("version", false, "Prints the version number")
 	createExampleConfig := flag.Bool("config", false, "Writes the lan-monitor.json to local dir as example")
-	cmdlineHTTPPort := flag.Int("port", config.HTTPPort, "HTTP port for the webserver")
-	cmdlineNMAPScanRange := flag.String("range", config.NMAPRange, "The range NMAP should scan e.g. 192.168.1.1/24 it has to be nmap compatible")
-	cmdlineScanInterval := flag.Int("scan-rate", config.ScanInterval, "The interval of the scans in seconds")
+	cmdlineHTTPPort := flag.Int("port", defaultHTTPPort, "HTTP port for the webserver")
+	cmdlineNMAPScanRange := flag.String("range", defaultNMAPRange, "The range NMAP should scan e.g. 192.168.1.1/24 it has to be nmap compatible")
+	cmdlineScanInterval := flag.Int("scan-rate", defaultScanInterval, "The interval of the scans in seconds")
 	configFileLocation := flag.String("config-file", defaultConfigFileLocation, "Location of the config file")
-	cmdlinePorts := flag.String("scan-ports", config.NMAPPorts, "The ports that will be scanned")
+	cmdlinePorts := flag.String("scan-ports", defaultNMAPPorts, "The ports that will be scanned")
 	flag.Parse()
 
 	//try to read the configfile
 	_, err := os.Stat(*configFileLocation)
+	var config Config
 	if err == nil {
 		config = readConfig(*configFileLocation)
 	} else {
 		log.Println("Config file is missing - looked at:", *configFileLocation)
 		log.Println("Reverting to commandline/defaults")
 	}
-
-	config.NMAPPorts = "22,80"
 
 	//if no range is defined in the config file
 	if config.NMAPRange == "" {
@@ -226,7 +221,7 @@ func main() {
 	go callNMAP(config)
 
 	//starting and configuring the webserver
-	fs := http.FileServer(http.Dir(filepath.Dir(workingDir) + "/www"))
+	fs := http.FileServer(http.Dir(path.Join(workingDir, "www")))
 	http.HandleFunc("/ws", wsHandler)
 	http.Handle("/", fs)
 	listenAddress := ":" + strconv.Itoa(config.HTTPPort)
